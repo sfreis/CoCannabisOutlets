@@ -1,0 +1,121 @@
+---
+title: "Dispensaries in Colorado"
+author: "Sam Freis"
+date: "7/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)      
+library(tidycensus)  
+census_api_key("73dec3849e29ee85e14c968992d4e99dd2dbdc4b")
+library(dplyr)        
+library(sf)           
+library(tidyverse)
+library(urbnmapr)
+library(RColorBrewer)
+library(scales)
+library(excelR)
+library(knitr)
+library(sp)
+library(data.table)
+library(psych)
+
+RecDispsCensus <- read.csv("~/Dropbox/GradSchool/Projects/GISgeneral/Cannabis/RecDispsCensus.csv")
+RecDispsCounts <-as.data.frame((table(RecDispsCensus$STCOFIPS)))
+RecDispsCounts$county_fips<-str_pad(RecDispsCounts$Var1,5, pad = "0")
+counties_sf <- get_urbn_map("counties", sf = TRUE)
+spatial_data <- left_join(get_urbn_map(map = "counties", sf = TRUE),
+                          RecDispsCounts,
+                          by = "county_fips")
+
+spatial_data$Freq[is.na(spatial_data$Freq)] = 0
+spatial_data_co<-spatial_data[which(spatial_data$state_abbv=='CO'), ]
+```
+
+### County Level Information
+```{r}
+knitr::kable(describe(spatial_data_co$Freq,type=2,fast=T,),booktabs=TRUE,format="markdown",  digits = 2)
+hist(spatial_data_co$Freq, col=rgb(0,1,0,0.5), breaks = 30, xlab = "Dispensaries per County", main = NULL)
+```
+
+Denver county (population 705,576) is quite the outlier with over 150 recreational dispensaries. Compare this to El Paso county (720,403) with 0 recreational dispensaries. 
+\newpage
+
+```{r}
+spatial_data %>%
+  filter(state_name == "Colorado") %>%
+  ggplot() +
+  geom_sf(mapping = aes(fill = Freq),
+          color = '#ffffff', size = 0.25) +
+  coord_sf(datum = NA) +
+  scale_fill_gradientn(colours=brewer.pal(n=8, name="PuBuGn")) +
+  labs(fill = "Dispensaries per County")
+
+```
+
+Most counties in Colorado in 2019 didn't have any dispensaries. Though cannabis is legal in the state of Colorado, it is up to individual counties to permit the sale of recreational cannabis. As of 2018, only 35 % of counties allowed retail or medical cannabis sales. 
+
+\newpage
+
+### County Tract Level Information
+Census tracts, blocks, and block groups are more fine grain than zip codes or counties. Think of these more as neighborhood level boundaries. 
+
+```{r, include=FALSE}
+RecDispsCensus$GEOID<-str_pad(RecDispsCensus$FIPS,11, pad = "0")
+
+data <- get_acs(state = "co", 
+                #year = 2018,
+                geography = "tract",
+                variables = c(Total = "B01001_001", 
+                              Poverty = "B06012_002"),
+                geometry = TRUE,
+                survey = "acs5",
+                output = "wide")
+
+RecDispsCountsTracts <-as.data.frame((table(RecDispsCensus$FIPS)))
+RecDispsCountsTracts$GEOID<-str_pad(RecDispsCountsTracts$Var1,11, pad = "0")
+RecDispsTractsGeo<-merge(RecDispsCountsTracts, data, by = "GEOID", all = TRUE)
+RecDispsTractsGeo$Freq[is.na(RecDispsTractsGeo$Freq)] = 0
+
+RecDispsTractsGeo$geometry<-NULL
+
+data2<-left_join(data,RecDispsTractsGeo)
+```
+
+```{r}
+knitr::kable(describe(RecDispsTractsGeo$Freq,type=2,fast=T,),booktabs=TRUE,format="markdown",  digits = 2)
+hist(RecDispsTractsGeo$Freq, col=rgb(0,1,0,0.5), breaks = 5, xlab = "Dispensaries per Census Tract", main = NULL)
+```
+
+```{r}
+ data2 %>%
+  ggplot(aes(fill = Freq)) + 
+  geom_sf(color = NA) + 
+  scale_fill_viridis_c() 
+```
+
+### Plotting the dispensaries 
+```{r}
+library(ggmap)
+library(mapdata)
+coords<-RecDispsCensus[c("x","y")]
+qmplot(x, y, data = RecDispsCensus, colour = I('green'), size = I(.3), darken = .3)
+
+MainStates <- map_data("state")
+colorado <- filter(MainStates,region ==  "colorado")
+
+ggplot(RecDispsCensus, aes(x = x, y = y)) +
+   geom_polygon(data = colorado, aes(x=long, y = lat, group = group), fill="grey", alpha=0.3) +
+  coord_equal() + 
+  xlab('Longitude') + 
+  ylab('Latitude') + 
+  stat_density2d(aes(fill = ..level..), alpha = .5,
+                 h = .02, n = 300,
+                 geom = "polygon", data = RecDispsCensus) + 
+  scale_fill_viridis_c() + 
+  theme(legend.position = 'none')
+
+```
