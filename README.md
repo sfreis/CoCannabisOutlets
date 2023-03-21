@@ -1,7 +1,7 @@
 # CoCannabisOutlets
-GIS derived descriptives and visualizations of retail cannabis outlets in Colorado
+## The geographic distribution of cannabis dispensaries in Colorado
 
-https://sfreis.github.io/CoCannabisOutlets/cannabis.mapping.html
+GIS derived descriptives and visualizations of retail cannabis outlets in Colorado
 
 Made with R libraries: 
 library(ggplot2)      
@@ -17,3 +17,7 @@ library(knitr)
 library(sp)
 library(data.table)
 library(psych)
+
+Report here: https://sfreis.github.io/CoCannabisOutlets/cannabis.mapping.html
+
+![canmap](https://user-images.githubusercontent.com/54371512/226496103-bd4e857b-39d4-414e-9661-beb98e74dffd.png)
